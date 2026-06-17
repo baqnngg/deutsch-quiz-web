@@ -120,7 +120,7 @@ export default function Page() {
         <h1 style={S.heroTitle}>Deutsch Quiz</h1>
         <p style={S.heroSub}>기말고사 대비 · 제4강 ~ 제9강</p>
         <div style={S.chips}>{Object.values(CH).map(c=><span key={c} style={S.chip}>{c}</span>)}</div>
-        <p style={S.heroInfo}>50문제 · 4지선다 객관식</p>
+        <p style={S.heroInfo}>기본 50문제 · AI 생성 30문제</p>
         <button style={S.btnW} onClick={startDefault}>기본 문제로 시작</button>
         <button style={{...S.btnA,opacity:generating?.6:1}} onClick={generate} disabled={generating}>
           {generating?"⏳ AI로 새 문제 생성 중...":"🤖 AI로 새 문제 생성하기"}
