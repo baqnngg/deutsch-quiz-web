@@ -79,39 +79,54 @@ export async function POST() {
     return Response.json({ error: "GEMINI_API_KEY not configured" }, { status: 500 });
   }
 
+  const MODEL = "gemini-2.5-flash";
+  const url = "https://generativelanguage.googleapis.com/v1beta/models/" + MODEL + ":generateContent?key=" + apiKey;
+
   try {
-    const res = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + apiKey,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: "user",
-              parts: [{ text: COURSE_CONTEXT + "\n\n" + USER_PROMPT }],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.9,
-            maxOutputTokens: 8192,
-            responseMimeType: "application/json",
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: COURSE_CONTEXT + "\n\n" + USER_PROMPT }],
           },
-        }),
-      }
-    );
+        ],
+        generationConfig: {
+          temperature: 0.9,
+          maxOutputTokens: 8192,
+        },
+      }),
+    });
 
     if (!res.ok) {
-      const errText = await res.text();
-      console.error("Gemini API error:", errText);
-      return Response.json({ error: "API call failed" }, { status: 500 });
+      const errData = await res.json().catch(() => ({}));
+      const msg = errData?.error?.message || res.statusText || "Unknown error";
+      console.error("Gemini API error:", res.status, msg);
+      return Response.json({ error: "Gemini API: " + msg }, { status: 500 });
     }
 
     const data = await res.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) throw new Error("Empty response from Gemini");
 
-    const clean = text.replace(/```json\s*|```\s*/g, "").trim();
+    if (data.candidates?.[0]?.finishReason === "SAFETY") {
+      return Response.json({ error: "Safety filter triggered, try again" }, { status: 500 });
+    }
+
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) {
+      console.error("Unexpected Gemini response:", JSON.stringify(data).slice(0, 500));
+      throw new Error("Empty response");
+    }
+
+    // Strip markdown fences and find JSON array
+    let clean = text.replace(/```json\s*|```\s*/g, "").trim();
+    const startIdx = clean.indexOf("[");
+    const endIdx = clean.lastIndexOf("]");
+    if (startIdx !== -1 && endIdx !== -1) {
+      clean = clean.slice(startIdx, endIdx + 1);
+    }
+
     const questions = JSON.parse(clean);
 
     if (!Array.isArray(questions) || questions.length === 0) {
@@ -121,6 +136,6 @@ export async function POST() {
     return Response.json({ questions });
   } catch (err) {
     console.error("Generate error:", err);
-    return Response.json({ error: "퀴즈 생성 실패: " + (err.message || "알 수 없는 오류") }, { status: 500 });
+    return Response.json({ error: err.message || "퀴즈 생성 실패" }, { status: 500 });
   }
 }
