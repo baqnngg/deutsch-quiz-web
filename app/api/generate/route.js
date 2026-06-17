@@ -101,13 +101,26 @@ export async function POST() {
     });
 
     if (!res.ok) {
-      const errData = await res.json().catch(() => ({}));
-      const msg = errData?.error?.message || res.statusText || "Unknown error";
-      console.error("Gemini API error:", res.status, msg);
-      return Response.json({ error: "Gemini API: " + msg }, { status: 500 });
+      const errText = await res.text().catch(() => "");
+      let msg = res.status + " " + res.statusText;
+      try {
+        const errJson = JSON.parse(errText);
+        msg = errJson?.error?.message || msg;
+      } catch {
+        if (errText) msg = errText.slice(0, 200);
+      }
+      console.error("Gemini API error:", msg);
+      return Response.json({ error: msg }, { status: 500 });
     }
 
-    const data = await res.json();
+    const rawText = await res.text();
+    let data;
+    try {
+      data = JSON.parse(rawText);
+    } catch {
+      console.error("Gemini returned non-JSON:", rawText.slice(0, 300));
+      return Response.json({ error: "Gemini이 JSON이 아닌 응답을 반환했습니다" }, { status: 500 });
+    }
 
     if (data.candidates?.[0]?.finishReason === "SAFETY") {
       return Response.json({ error: "Safety filter triggered, try again" }, { status: 500 });

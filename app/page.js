@@ -85,9 +85,11 @@ export default function Page() {
     setGenerating(true); setGenError("");
     try {
       const res = await fetch("/api/generate", { method: "POST" });
-      const data = await res.json();
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch { throw new Error("서버 응답 파싱 실패: " + text.slice(0, 100)); }
       if (data.error) throw new Error(data.error);
-      if (!data.questions?.length) throw new Error("No questions returned");
+      if (!data.questions?.length) throw new Error("문제가 생성되지 않았습니다");
       setGenCount(c => c + 1);
       startWith(data.questions);
     } catch (e) {
